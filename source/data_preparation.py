@@ -7,7 +7,14 @@ from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 
 def split_video(input_path, output_dir, segment_duration_s=2, max_segments=2):
-    """split the input video into segments of segment_duration_s seconds"""
+    """
+    split the input video into segments of segment_duration_s seconds
+    Args:
+        input_path: str, path to video
+        output_dir: str, path to output directory
+        segment_duration_s: float, segment duration
+        max_segments: int, number of max segments to extract
+    """
     # - load video
     video = VideoFileClip(input_path)
     duration_s = video.duration # in seconds
@@ -42,6 +49,9 @@ def split_video(input_path, output_dir, segment_duration_s=2, max_segments=2):
 def extract_frames(video_path, output_dir):
     """
     Reads a video file and saves each frame as a JPEG image.
+    Args:
+        video_path: str, path to video
+        output_dir: str, path to output directory
     """
     # Create the output directory if it doesn't exist
     if not os.path.exists(output_dir):
@@ -77,7 +87,15 @@ def extract_frames(video_path, output_dir):
     print(f"Done! {count} images saved to '{output_dir}'.")
 
 
-def create_text_clip(text, duration, color=(255, 255, 255), font_size=60):
+def create_text_clip(text, duration, color=(255, 255, 255), font_size=50):
+    """
+    create a clip with text for video inserts
+    Args:
+        text: str, text to insert
+        duration: float, duration of clip in seconds
+        color: tuple, color in RGB for text
+        font_size: int, font size
+    """
     # Create a transparent image
     img = Image.new('RGBA', (1280, 720), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
@@ -96,10 +114,18 @@ def create_text_clip(text, duration, color=(255, 255, 255), font_size=60):
 
 
 def extract_and_combine(video_path, moments, output_filename, query):
+    """
+    extract clips based on moments and combine them into a single video
+    Args:
+        video_path: str, path to original video
+        moments: list, moments with start, end in seconds
+        output_filename: str, output file for vide
+        query: str, current query
+    """
     video = VideoFileClip(video_path)
     duration_s = video.duration # in seconds
     clips = []
-    intro_clip = create_text_clip(f"Query {query}", 3)
+    intro_clip = create_text_clip(f"Query = {query}", 3)
     clips.append(intro_clip)
 
     for start, end in moments:
@@ -118,11 +144,44 @@ def extract_and_combine(video_path, moments, output_filename, query):
     # Stitch all clips together
     final_video = concatenate_videoclips(clips)
 
-    # Write to disk  
+    # Write to disk
     final_video.write_videofile(output_filename, codec="libx264", audio_codec="aac")
 
     # Clean up memory
     video.close()
+
+
+def merge_moments(moments):
+    """
+    merge moments that intersect
+    Args:
+        moments: list, moments with start, end in seconds
+    Returns:
+        merged_moments: list, moments with start, end in seconds
+
+    """
+    if not moments:
+        return []
+
+    # Sort moments by start time
+    sorted_moments = sorted(moments, key=lambda x: x[0])
+
+    merged = [list(sorted_moments[0])]
+
+    for current_start, current_end in sorted_moments[1:]:
+        # Get the 'end' of the last moment we added to the merged list
+        last_end = merged[-1][1]
+
+        # If current start is <= last end, they overlap or touch
+        if current_start <= last_end:
+            # Update the end of the last moment to the maximum of both
+            merged[-1][1] = max(last_end, current_end)
+        else:
+            # No overlap, add as a new moment
+            merged.append([current_start, current_end])
+
+    # Convert back to list of tuples
+    return [tuple(m) for m in merged]
 
 
 
